@@ -1,0 +1,17 @@
+import os 
+
+ORIGINAL_VIDEO_NAME = "MOVI0020"
+FILE_TYPE = ".avi"
+SOURCE_ORIGINAL_VIDEO_PATH = os.path.join("original_videos", f"{ORIGINAL_VIDEO_NAME}{FILE_TYPE}")
+
+
+counter = 2
+VIDEO_NAME = f"{ORIGINAL_VIDEO_NAME}-short{counter}"
+SOURCE_VIDEO_PATH = os.path.join("video_shorts", f"{VIDEO_NAME}{FILE_TYPE}")
+TARGET_VIDEO_PATH = f"video_results/{VIDEO_NAME}-output{FILE_TYPE}"
+
+
+THICKNESS_DEFAULT = 4
+TEXT_THICKNESS_DEFAULT = 4
+TEXT_SCALE_DEFAULT = 2
+TRACE_LENGTH_DEFAULT = 4
