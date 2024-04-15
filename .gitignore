@@ -1,6 +1,7 @@
-video*
+
 yolov8x.pt
 __pycache__
-original_videos
-
+original_videos/*
+video_results/*
+video_shorts/*
 full_recordings/*
