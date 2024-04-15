@@ -2,3 +2,5 @@ video*
 yolov8x.pt
 __pycache__
 original_videos
+
+full_recordings/*
