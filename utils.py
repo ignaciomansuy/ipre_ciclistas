@@ -3,6 +3,8 @@ from tqdm.notebook import tqdm
 import math
 from VARIABLES2 import *
 import supervision as sv
+import numpy as np
+import torch
 
 
 def calculate_hypotenuse(a, b):
@@ -70,12 +72,47 @@ class VideoInfoHandler():
     
     self.line_zones = new_line_zones
     
-    
+
+            
+
+vih = VideoInfoHandler()
+
+def callback(frame: np.ndarray, index:int, model, selected_classes) -> np.ndarray:
+    # model prediction on single frame and conversion to supervision Detections
+    results = model(frame, verbose=False, device=torch.device("cuda:0"))[0]
+    detections = sv.Detections.from_ultralytics(results)
+    # only consider class id from selected_classes define above 
+    detections = detections[np.isin(detections.class_id, selected_classes)]
+    # tracking detections
+    detections = vih.byte_tracker.update_with_detections(detections)
+    labels = [
+        f"#{tracker_id} {model.model.names[class_id]} {confidence:0.2f}"
+        for confidence, class_id, tracker_id
+        in zip(detections.confidence, detections.class_id, detections.tracker_id)
+    ]
+    annotated_frame = vih.trace_annotator.annotate(
+        scene=frame.copy(),
+        detections=detections
+    )
+    annotated_frame=vih.label_annotator.annotate(
+        scene=annotated_frame,
+        detections=detections,
+        labels=labels)
+
+    # update line counter
+    for line_zone in vih.line_zones:
+        line_zone.trigger(detections)
+    # return frame with box and line annotated result
+    for i in range(3):
+        annotated_frame = vih.line_zone_annotators[i].annotate(annotated_frame, line_counter=vih.line_zones[i])
+    return  annotated_frame
 
 def process_video(
     source_path: str,
     target_path: str,
     callback,
+    model,
+    selected_classes,
     stride=1,
 ) -> None:
     """
@@ -109,5 +146,6 @@ def process_video(
         for index, frame in tqdm(enumerate(
             sv.get_video_frames_generator(source_path=source_path, stride=stride)
         ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames):
-            result_frame = callback(frame, index)
+            result_frame = callback(frame, index, model, selected_classes)
             sink.write_frame(frame=result_frame)
+            
