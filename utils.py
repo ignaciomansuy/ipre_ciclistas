@@ -1,7 +1,7 @@
 
 from tqdm.notebook import tqdm
 import math
-from VARIABLES2 import *
+from VARIABLES import *
 import supervision as sv
 import numpy as np
 import torch

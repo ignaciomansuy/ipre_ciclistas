@@ -1,7 +1,7 @@
 import subprocess
 
 # Now you can access the updated variables
-from VARIABLES2 import *
+from VARIABLES import *
 
 def seconds_to_hhmmss(seconds):
     hours = seconds // 3600
