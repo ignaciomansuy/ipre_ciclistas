@@ -1,7 +1,7 @@
 
 from tqdm.notebook import tqdm
 import math
-from VARIABLES2 import *
+from VARIABLES import *
 import supervision as sv
 import numpy as np
 import torch
@@ -28,7 +28,7 @@ class VideoInfoHandler():
     self.label_annotator = sv.LabelAnnotator( text_thickness=self.va_params["text_thickness"], text_scale=self.va_params["text_scale"])
     self.trace_annotator = sv.TraceAnnotator(thickness=self.va_params["thickness"], trace_length=self.va_params["trace_length"])
     self.byte_tracker = sv.ByteTrack(
-      track_activation_threshold=0.25, lost_track_buffer=150, minimum_matching_threshold=0.8, frame_rate=self.video_info.fps
+      track_activation_threshold=0.25, lost_track_buffer=30, minimum_matching_threshold=0.8, frame_rate=self.video_info.fps
     )
     self.init_line_zones()
     
@@ -75,9 +75,8 @@ class VideoInfoHandler():
 
             
 
-vih = VideoInfoHandler()
 
-def callback(frame: np.ndarray, index:int, model, selected_classes) -> np.ndarray:
+def callback(frame: np.ndarray, index:int, model, selected_classes, vih) -> np.ndarray:
     # model prediction on single frame and conversion to supervision Detections
     results = model(frame, verbose=False, device=torch.device("cuda:0"))[0]
     detections = sv.Detections.from_ultralytics(results)
@@ -113,6 +112,7 @@ def process_video(
     callback,
     model,
     selected_classes,
+    vih,
     stride=1,
 ) -> None:
     """
@@ -146,6 +146,6 @@ def process_video(
         for index, frame in tqdm(enumerate(
             sv.get_video_frames_generator(source_path=source_path, stride=stride)
         ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames):
-            result_frame = callback(frame, index, model, selected_classes)
+            result_frame = callback(frame, index, model, selected_classes, vih)
             sink.write_frame(frame=result_frame)
             
