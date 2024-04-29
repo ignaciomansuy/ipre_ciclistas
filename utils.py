@@ -75,9 +75,8 @@ class VideoInfoHandler():
 
             
 
-vih = VideoInfoHandler()
 
-def callback(frame: np.ndarray, index:int, model, selected_classes) -> np.ndarray:
+def callback(frame: np.ndarray, index:int, model, selected_classes, vih) -> np.ndarray:
     # model prediction on single frame and conversion to supervision Detections
     results = model(frame, verbose=False, device=torch.device("cuda:0"))[0]
     detections = sv.Detections.from_ultralytics(results)
@@ -113,6 +112,7 @@ def process_video(
     callback,
     model,
     selected_classes,
+    vih,
     stride=1,
 ) -> None:
     """
@@ -146,6 +146,6 @@ def process_video(
         for index, frame in tqdm(enumerate(
             sv.get_video_frames_generator(source_path=source_path, stride=stride)
         ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames):
-            result_frame = callback(frame, index, model, selected_classes)
+            result_frame = callback(frame, index, model, selected_classes, vih)
             sink.write_frame(frame=result_frame)
             
