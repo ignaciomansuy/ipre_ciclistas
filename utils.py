@@ -28,7 +28,7 @@ class VideoInfoHandler():
     self.label_annotator = sv.LabelAnnotator( text_thickness=self.va_params["text_thickness"], text_scale=self.va_params["text_scale"])
     self.trace_annotator = sv.TraceAnnotator(thickness=self.va_params["thickness"], trace_length=self.va_params["trace_length"])
     self.byte_tracker = sv.ByteTrack(
-      track_activation_threshold=0.25, lost_track_buffer=150, minimum_matching_threshold=0.8, frame_rate=self.video_info.fps
+      track_activation_threshold=0.25, lost_track_buffer=30, minimum_matching_threshold=0.8, frame_rate=self.video_info.fps
     )
     self.init_line_zones()
     
