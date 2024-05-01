@@ -5,7 +5,7 @@ from VARIABLES import *
 import supervision as sv
 import numpy as np
 import torch
-
+from line_zone import LineZone
 
 def calculate_hypotenuse(a, b):
   return math.sqrt(a**2 + b**2)
@@ -56,7 +56,7 @@ class VideoInfoHandler():
     for i in [-1, 0, 1]:
         x = self.video_info.width * (1 / 2 + i * 0.15)
         line_zones.append(
-          sv.LineZone(
+          LineZone(
           start=sv.Point( x, 0),
           end=sv.Point(x, self.video_info.height)
           )

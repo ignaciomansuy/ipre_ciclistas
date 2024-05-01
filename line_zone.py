@@ -8,6 +8,7 @@ from supervision.draw.color import Color
 from supervision.draw.utils import draw_text
 from supervision.geometry.core import Point, Position, Vector
 
+from collections import defaultdict 
 
 class LineZone:
     """
@@ -80,6 +81,8 @@ class LineZone:
         self.tracker_state: Dict[str, bool] = {}
         self.in_count: int = 0
         self.out_count: int = 0
+        self.class_in_count: Dict[int, int] = defaultdict(int)
+        self.class_out_count: Dict[int, int] = defaultdict(int)
         self.triggering_anchors = triggering_anchors
 
     @staticmethod
@@ -180,11 +183,15 @@ class LineZone:
                 continue
 
             self.tracker_state[tracker_id] = tracker_state
+            class_id = detections[i].class_id[0]
+            print(class_id)
             if tracker_state:
                 self.in_count += 1
+                self.class_in_count[class_id] += 1
                 crossed_in[i] = True
             else:
                 self.out_count += 1
+                self.class_out_count[class_id] += 1
                 crossed_out[i] = True
 
         return crossed_in, crossed_out
