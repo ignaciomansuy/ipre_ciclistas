@@ -1,4 +1,5 @@
 
+from typing import Dict, Iterable, Optional, Tuple, List
 from tqdm.notebook import tqdm
 import math
 from VARIABLES import *
@@ -6,6 +7,9 @@ import supervision as sv
 import numpy as np
 import torch
 from line_zone import LineZone
+import csv
+
+
 
 def calculate_hypotenuse(a, b):
   return math.sqrt(a**2 + b**2)
@@ -18,7 +22,7 @@ class VideoInfoHandler():
     self.label_annotator = None
     self.trace_annotator = None
     self.byte_tracker = None
-    self.line_zones = [] 
+    self.line_zones: List[LineZone] = [] 
     pass
     
   def re_init(self, SOURCE_VIDEO_PATH):
@@ -51,7 +55,7 @@ class VideoInfoHandler():
                 )
               for _ in range(3)]
     
-  def get_line_zones(self):
+  def get_line_zones(self) -> List[LineZone]:
     line_zones = []
     for i in [-1, 0, 1]:
         x = self.video_info.width * (1 / 2 + i * 0.15)
@@ -69,7 +73,11 @@ class VideoInfoHandler():
       for i, ex_line in enumerate(self.line_zones):
         new_line_zones[i].in_count = ex_line.in_count
         new_line_zones[i].out_count = ex_line.out_count
-    
+        for key, value in ex_line.class_in_count.items():
+          new_line_zones[i].class_in_count[key] = value
+        for key, value in ex_line.class_out_count.items():
+          new_line_zones[i].class_out_count[key] = value
+          
     self.line_zones = new_line_zones
     
 
@@ -148,4 +156,91 @@ def process_video(
         ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames):
             result_frame = callback(frame, index, model, selected_classes, vih)
             sink.write_frame(frame=result_frame)
+
             
+class LineZoneMaxCounterHelper():
+  """docstring for LineZoneMaxCounterHelper."""
+  def __init__(self, class_id: int, class_name: str):
+    self.class_id = class_id
+    self.class_name = class_name
+    
+    self.in_count: int = 0
+    self.out_count: int = 0
+    self.counting_history: List[List[str, int, int]] = []
+
+  def update_counting(self, line_zones: List[LineZone], file_name: str):
+    """Saves object counting for this file and updates instance attributes
+
+    Args:
+        line_zones (List[LineZone])
+        file_name (str)
+    """
+    max_in, max_out = self.get_maxs(line_zones)
+    
+    self.counting_history.append([
+      file_name,
+      max_in - self.in_count,
+      max_out - self.out_count
+    ])
+    
+    self.in_count = max_in
+    self.out_count = max_out
+    
+  def save_to_csv(self, folder_path: str):
+    to_csv(
+      folder_path,
+      file_name=f"{self.class_name}.csv",
+      data=self.counting_history
+    )
+    
+  def get_maxs(self, line_zones: List[LineZone]):
+    line_zone_max_in = max(line_zones, key=lambda x: x.class_in_count[self.class_id])
+    max_in = line_zone_max_in.class_in_count[self.class_id]
+    line_zone_max_out = max(line_zones, key=lambda x: x.class_out_count[self.class_id])
+    max_out = line_zone_max_out.class_out_count[self.class_id]
+    return max_in, max_out
+      
+      
+def save_results(max_counters: Dict[int, LineZoneMaxCounterHelper], selected_classes: List[int], folder_path: str):
+  first = True
+  for class_ in selected_classes:
+    # Save counting of each class in individual .csv
+    counter = max_counters[class_]
+    counter.save_to_csv(folder_path)
+    
+    if first:
+      all_counts = counter.counting_history
+      first = False
+    else:
+      for i, (_, in_, out_) in enumerate(counter.counting_history):
+        all_counts[i][1] += in_
+        all_counts[i][2] += out_
+  
+  # Save .csv with general counting for each video
+  to_csv(
+    folder_path,
+    file_name="all_classes.csv",
+    data=all_counts
+  )
+
+  # Total count for in and out direction in .txt
+  save_total_count(max_counters, selected_classes, folder_path)
+    
+
+
+def to_csv(folder_path: str, file_name: str, data: List[List]):
+  with open(os.path.join(folder_path, file_name), "w", newline="") as csv_output:
+    writer = csv.writer(csv_output)
+    writer.writerows(
+      [["file_name", "in", "out"]] + data
+    )
+
+
+def save_total_count(max_counters: Dict[int, LineZoneMaxCounterHelper], selected_classes: List[int], folder_path: str):
+  total_in, total_out = 0, 0
+  for class_ in selected_classes:
+    total_in += max_counters[class_].in_count
+    total_out += max_counters[class_].out_count
+  
+  with open(os.path.join(folder_path, "total_count"), 'w') as file:
+    file.write(f"{total_in}, {total_out}")

@@ -184,7 +184,6 @@ class LineZone:
 
             self.tracker_state[tracker_id] = tracker_state
             class_id = detections[i].class_id[0]
-            print(class_id)
             if tracker_state:
                 self.in_count += 1
                 self.class_in_count[class_id] += 1
