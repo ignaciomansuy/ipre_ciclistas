@@ -7,3 +7,6 @@ video_shorts/*
 full_recordings/*
 results/videos
 processing_results/*/videos_output
+datasets
+runs
+results/videos
