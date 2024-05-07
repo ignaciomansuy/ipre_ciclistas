@@ -1,7 +1,7 @@
 import os 
 
-ORIGINAL_VIDEO_NAME = "2"
-FILE_TYPE = ".mp4"
+ORIGINAL_VIDEO_NAME = "MOVI0016"
+FILE_TYPE = ".avi"
 SOURCE_ORIGINAL_VIDEO_PATH = os.path.join("original_videos", f"{ORIGINAL_VIDEO_NAME}{FILE_TYPE}")
 
 
