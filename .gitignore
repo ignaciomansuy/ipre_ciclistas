@@ -10,3 +10,4 @@ processing_results/*/videos_output
 datasets
 runs
 results/videos
+coco_bicycles_dataset
