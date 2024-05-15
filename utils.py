@@ -246,5 +246,6 @@ def save_total_count(max_counters: Dict[int, LineZoneMaxCounterHelper], selected
     total_in += max_counters[class_].in_count
     total_out += max_counters[class_].out_count
   
-  with open(os.path.join(folder_path, "total_count"), 'w') as file:
+  # TODO: change this .json and save total of echa class and sum of all classes 
+  with open(os.path.join(folder_path, "total_count.txt"), 'w') as file:
     file.write(f"{total_in}, {total_out}")
