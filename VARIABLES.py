@@ -2,7 +2,7 @@ import os
 
 # MODEL = "yolov8x.pt"
 # MODEL = "runs/detect/train10/weights/best.pt"
-MODEL = "runs/detect/train11/weights/best.pt"
+MODEL = "runs/detect/train16/weights/best.pt"
 ORIGINAL_VIDEO_NAME = "MOVI0016"
 FILE_TYPE = ".avi"
 SOURCE_ORIGINAL_VIDEO_PATH = os.path.join("original_videos", f"{ORIGINAL_VIDEO_NAME}{FILE_TYPE}")
