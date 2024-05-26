@@ -9,19 +9,22 @@ import torch
 from line_zone import LineZone
 import csv
 from ultralytics import YOLO
+from datetime import datetime
 
-
+def getDateTimeShort():
+  return datetime.now().strftime("%Y-%m-%d %H-%M-%S")
 
 def calculate_hypotenuse(a, b):
   return math.sqrt(a**2 + b**2)
 
 class VideoInfoHandler():
-  def __init__(self) -> None:
+  def __init__(self, models: Dict[str, Tuple[YOLO, List[int]]]) -> None:
     self.video_info = None
+    self.models = models
     self.va_params = {}
     self.bounding_box_annotator: sv.BoundingBoxAnnotator = None
-    self.label_annotator = None
-    self.byte_tracker = None
+    self.label_annotator: sv.LabelAnnotator = None
+    self.byte_trackers: Dict[str, sv.ByteTrack] = None
     self.line_zones: List[LineZone] = [] 
     pass
     
@@ -30,9 +33,10 @@ class VideoInfoHandler():
     self.__init_va_params()
     self.bounding_box_annotator = sv.BoundingBoxAnnotator(thickness=1)
     self.label_annotator = sv.LabelAnnotator( text_thickness=self.va_params["text_thickness"], text_scale=self.va_params["text_scale"])
-    self.byte_tracker = sv.ByteTrack(
-      track_activation_threshold=0.25, lost_track_buffer=30, minimum_matching_threshold=0.8, frame_rate=self.video_info.fps
-    )
+    self.byte_tracker = {
+      class_name: sv.ByteTrack(
+      track_activation_threshold=0.25, lost_track_buffer=30, minimum_matching_threshold=0.8, frame_rate=self.video_info.fps) for class_name in self.models.keys()
+    }
     self.__init_line_zone_annotators()
     self.__init_line_zones()
     
@@ -86,46 +90,52 @@ class VideoInfoHandler():
             
 
 
-def callback(frame: np.ndarray, index:int, model: YOLO,
-             selected_classes: List[int], vih: VideoInfoHandler) -> np.ndarray:
+def callback(frame: np.ndarray, index:int, models: Dict[str, Tuple[YOLO, List[int]]],
+            vih: VideoInfoHandler) -> np.ndarray:
     # model prediction on single frame and conversion to supervision Detections
-    results = model(frame, verbose=False, device=torch.device("cuda:0"))[0]
-    detections = sv.Detections.from_ultralytics(results)
-    # only consider class id from selected_classes define above 
-    detections = detections[np.isin(detections.class_id, selected_classes)]
-    # tracking detections
-    detections = vih.byte_tracker.update_with_detections(detections)
-    labels = [
-        f"#{tracker_id} {model.model.names[class_id]} {confidence:0.2f}"
-        for confidence, class_id, tracker_id
-        in zip(detections.confidence, detections.class_id, detections.tracker_id)
-    ]
-    annotated_frame=vih.label_annotator.annotate(
-        scene=frame,
-        detections=detections,
-        labels=labels)
-    
-    annotated_frame=vih.bounding_box_annotator.annotate(
-      scene=annotated_frame,
-      detections=detections
-    )
+    all_detections = []
+    for class_name, (model, selected_classes) in models.items():
+      results = model(frame, verbose=False, device=torch.device("cuda:0"))[0]
+      detections = sv.Detections.from_ultralytics(results)
+      # only consider class id from selected_classes define above 
+      detections = detections[np.isin(detections.class_id, selected_classes)]
+      # tracking detections
+      detections = vih.byte_tracker[class_name].update_with_detections(detections)
+      all_detections.append(detections)
 
-    for line_zone in vih.line_zones:
-        line_zone.trigger(detections)
+    annotated_frame = frame
+    for i, (class_name, (model, selected_classes)) in enumerate(models.items()):
+      detections = all_detections[i]
+      labels = [
+          f"#{tracker_id} {model.model.names[class_id]} {confidence:0.2f}"
+          for confidence, class_id, tracker_id
+          in zip(detections.confidence, detections.class_id, detections.tracker_id)
+      ]
+      annotated_frame=vih.label_annotator.annotate(
+          scene=annotated_frame,
+          detections=detections,
+          labels=labels)
       
-    for i, line_annotator in enumerate(vih.line_zone_annotators):
-        annotated_frame = line_annotator.annotate(annotated_frame, line_counter=vih.line_zones[i])
+      annotated_frame=vih.bounding_box_annotator.annotate(
+        scene=annotated_frame,
+        detections=detections
+      )
+
+      for line_zone in vih.line_zones:
+          line_zone.trigger(detections, class_name)
+        
+      for i, line_annotator in enumerate(vih.line_zone_annotators):
+          annotated_frame = line_annotator.annotate(annotated_frame, line_counter=vih.line_zones[i])
 
     return  annotated_frame
 
 def process_video(
     source_path: str,
     target_path: str,
-    callback,
-    model,
-    selected_classes,
-    vih,
-    stride=1,
+    callback: callback,
+    models: Dict[str, Tuple[YOLO, List[int]]],
+    vih: VideoInfoHandler,
+    stride: int = 1,
 ) -> None:
     """
     Process a video file by applying a callback function on each frame
@@ -158,7 +168,7 @@ def process_video(
         for index, frame in tqdm(enumerate(
             sv.get_video_frames_generator(source_path=source_path, stride=stride)
         ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames - 217):
-            result_frame = callback(frame, index, model, selected_classes, vih)
+            result_frame = callback(frame, index, models, vih)
             sink.write_frame(frame=result_frame)
 
             
@@ -198,18 +208,18 @@ class LineZoneMaxCounterHelper():
     )
     
   def get_maxs(self, line_zones: List[LineZone]):
-    line_zone_max_in = max(line_zones, key=lambda x: x.class_in_count[self.class_id])
-    max_in = line_zone_max_in.class_in_count[self.class_id]
-    line_zone_max_out = max(line_zones, key=lambda x: x.class_out_count[self.class_id])
-    max_out = line_zone_max_out.class_out_count[self.class_id]
+    key = (self.class_name, self.class_id)
+    line_zone_max_in = max(line_zones, key=lambda x: x.class_in_count[key])
+    max_in = line_zone_max_in.class_in_count[key]
+    line_zone_max_out = max(line_zones, key=lambda x: x.class_out_count[key])
+    max_out = line_zone_max_out.class_out_count[key]
     return max_in, max_out
       
       
-def save_results(max_counters: Dict[int, LineZoneMaxCounterHelper], selected_classes: List[int], folder_path: str):
+def save_results(max_counters: Dict[int, LineZoneMaxCounterHelper], folder_path: str):
   first = True
-  for class_ in selected_classes:
+  for counter in max_counters.values():
     # Save counting of each class in individual .csv
-    counter = max_counters[class_]
     counter.save_to_csv(folder_path)
     
     if first:
@@ -228,7 +238,7 @@ def save_results(max_counters: Dict[int, LineZoneMaxCounterHelper], selected_cla
   )
 
   # Total count for in and out direction in .txt
-  save_total_count(max_counters, selected_classes, folder_path)
+  save_total_count(max_counters, folder_path)
     
 
 
@@ -240,11 +250,11 @@ def to_csv(folder_path: str, file_name: str, data: List[List]):
     )
 
 
-def save_total_count(max_counters: Dict[int, LineZoneMaxCounterHelper], selected_classes: List[int], folder_path: str):
+def save_total_count(max_counters: Dict[int, LineZoneMaxCounterHelper], folder_path: str):
   total_in, total_out = 0, 0
-  for class_ in selected_classes:
-    total_in += max_counters[class_].in_count
-    total_out += max_counters[class_].out_count
+  for counter in max_counters.values():
+    total_in += counter.in_count
+    total_out += counter.out_count
   
   # TODO: change this .json and save total of echa class and sum of all classes 
   with open(os.path.join(folder_path, "total_count.txt"), 'w') as file:
