@@ -7,6 +7,9 @@ video_shorts/*
 full_recordings/*
 results/videos
 processing_results/*/videos_output
+processing_results/* probando*
 datasets
 runs
 results/videos
+coco_bicycles_dataset
+cocodataset

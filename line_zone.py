@@ -81,8 +81,8 @@ class LineZone:
         self.tracker_state: Dict[str, bool] = {}
         self.in_count: int = 0
         self.out_count: int = 0
-        self.class_in_count: Dict[int, int] = defaultdict(int)
-        self.class_out_count: Dict[int, int] = defaultdict(int)
+        self.class_in_count: Dict[Tuple[str, int], int] = defaultdict(int)
+        self.class_out_count: Dict[Tuple[str, int], int] = defaultdict(int)
         self.triggering_anchors = triggering_anchors
 
     @staticmethod
@@ -123,7 +123,7 @@ class LineZone:
         cross_product_2 = limits[1].cross_product(point)
         return (cross_product_1 > 0) == (cross_product_2 > 0)
 
-    def trigger(self, detections: Detections) -> Tuple[np.ndarray, np.ndarray]:
+    def trigger(self, detections: Detections, class_name: str) -> Tuple[np.ndarray, np.ndarray]:
         """
         Update the `in_count` and `out_count` based on the objects that cross the line.
 
@@ -186,11 +186,11 @@ class LineZone:
             class_id = detections[i].class_id[0]
             if tracker_state:
                 self.in_count += 1
-                self.class_in_count[class_id] += 1
+                self.class_in_count[(class_name, class_id)] += 1
                 crossed_in[i] = True
             else:
                 self.out_count += 1
-                self.class_out_count[class_id] += 1
+                self.class_out_count[(class_name, class_id)] += 1
                 crossed_out[i] = True
 
         return crossed_in, crossed_out
