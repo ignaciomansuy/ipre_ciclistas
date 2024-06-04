@@ -136,6 +136,7 @@ def process_video(
     models: Dict[str, Tuple[YOLO, List[int]]],
     vih: VideoInfoHandler,
     stride: int = 1,
+    with_video_result = False
 ) -> None:
     """
     Process a video file by applying a callback function on each frame
@@ -169,7 +170,10 @@ def process_video(
             sv.get_video_frames_generator(source_path=source_path, stride=stride)
         ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames - 217):
             result_frame = callback(frame, index, models, vih)
-            sink.write_frame(frame=result_frame)
+            if with_video_result:
+              sink.write_frame(frame=result_frame)
+    if not with_video_result:
+      os.remove(target_path)
 
             
 class LineZoneMaxCounterHelper():
@@ -216,9 +220,9 @@ class LineZoneMaxCounterHelper():
     return max_in, max_out
       
       
-def save_results(max_counters: Dict[int, LineZoneMaxCounterHelper], folder_path: str):
+def save_results(max_counters: List[LineZoneMaxCounterHelper], folder_path: str, mode: str, videos_folder: str):
   first = True
-  for counter in max_counters.values():
+  for counter in max_counters:
     # Save counting of each class in individual .csv
     counter.save_to_csv(folder_path)
     
@@ -229,16 +233,39 @@ def save_results(max_counters: Dict[int, LineZoneMaxCounterHelper], folder_path:
       for i, (_, in_, out_) in enumerate(counter.counting_history):
         all_counts[i][1] += in_
         all_counts[i][2] += out_
-  
-  # Save .csv with general counting for each video
-  to_csv(
-    folder_path,
-    file_name="all_classes.csv",
-    data=all_counts
-  )
+        
+        
+  if mode == 'folders':
+    
+    # Save .csv with general counting for each video
+    to_csv(
+      folder_path,
+      file_name="all_classes.csv",
+      data=all_counts
+    )
 
-  # Total count for in and out direction in .txt
-  save_total_count(max_counters, folder_path)
+    # Total count for in and out direction in .txt
+    save_total_count(max_counters, folder_path)
+    
+  elif mode == "one_file":
+    counts = []
+    all_classes = LineZoneMaxCounterHelper(-1, "all_classes")
+    all_classes.counting_history = all_counts
+    for counter in list(max_counters) + [all_classes]:
+      class_name = counter.class_name
+      ins, outs = [], []
+      for _, max_in, max_out in counter.counting_history:
+        ins.append(max_in)
+        outs.append(max_out)
+      counts.append((class_name, ins, outs))
+      
+    if not os.path.exists(ONE_FILE_RESULTS):
+      create_all_results_file(counts)
+    
+    with open(ONE_FILE_RESULTS, "a") as file:
+      write_full_line(counts, videos_folder)
+    
+    
     
 
 
@@ -250,12 +277,34 @@ def to_csv(folder_path: str, file_name: str, data: List[List]):
     )
 
 
-def save_total_count(max_counters: Dict[int, LineZoneMaxCounterHelper], folder_path: str):
+def save_total_count(max_counters: List[LineZoneMaxCounterHelper], folder_path: str):
   total_in, total_out = 0, 0
-  for counter in max_counters.values():
+  for counter in max_counters:
     total_in += counter.in_count
     total_out += counter.out_count
   
-  # TODO: change this .json and save total of echa class and sum of all classes 
+  # TODO: change this .json and save total of each class and sum of all classes 
   with open(os.path.join(folder_path, "total_count.txt"), 'w') as file:
     file.write(f"{total_in}, {total_out}")
+    
+    
+def create_all_results_file(counts: List):
+  data = ["Punto"]
+  for i in [1, 2]:
+    for class_name, _, _ in counts:
+      for j in [str(i).zfill(2) for i in range(VIDEOS_PER_FOLDER)]:
+        data.append(f"mov{i}_{class_name}_{j}")
+  
+  with open(ONE_FILE_RESULTS, "w", newline="") as csv_output:
+    writer = csv.writer(csv_output)
+    writer.writerows([data])
+
+def write_full_line(counts: List, punto: str):
+  line = [punto]
+  for _, ins, outs in counts:
+    line.extend(ins)
+    line.extend(outs)
+    
+  with open(ONE_FILE_RESULTS, "a", newline="") as csv_output:
+    writer = csv.writer(csv_output)
+    writer.writerows([line])
