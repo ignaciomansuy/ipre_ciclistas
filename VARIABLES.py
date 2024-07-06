@@ -7,7 +7,7 @@ ORIGINAL_VIDEO_NAME = "MOVI0016"
 FILE_TYPE = ".avi"
 SOURCE_ORIGINAL_VIDEO_PATH = os.path.join("original_videos", f"{ORIGINAL_VIDEO_NAME}{FILE_TYPE}")
 
-ONE_FILE_RESULTS = "all_videosresults.csv"
+ONE_FILE_RESULTS = "all_videos_results.csv"
 VIDEOS_PER_FOLDER = 18
 
 

@@ -10,6 +10,7 @@ from line_zone import LineZone
 import csv
 from ultralytics import YOLO
 from datetime import datetime
+import copy
 
 def getDateTimeShort():
   return datetime.now().strftime("%Y-%m-%d %H-%M-%S")
@@ -168,7 +169,7 @@ def process_video(
     with sv.VideoSink(target_path=target_path, video_info=source_video_info) as sink:
         for index, frame in tqdm(enumerate(
             sv.get_video_frames_generator(source_path=source_path, stride=stride)
-        ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames - 217):
+        ), desc=" Video processing", position=1, leave=False, total=source_video_info.total_frames):
             result_frame = callback(frame, index, models, vih)
             if with_video_result:
               sink.write_frame(frame=result_frame)
@@ -227,7 +228,7 @@ def save_results(max_counters: List[LineZoneMaxCounterHelper], folder_path: str,
     counter.save_to_csv(folder_path)
     
     if first:
-      all_counts = counter.counting_history
+      all_counts = copy.deepcopy(counter.counting_history)
       first = False
     else:
       for i, (_, in_, out_) in enumerate(counter.counting_history):
@@ -262,8 +263,7 @@ def save_results(max_counters: List[LineZoneMaxCounterHelper], folder_path: str,
     if not os.path.exists(ONE_FILE_RESULTS):
       create_all_results_file(counts)
     
-    with open(ONE_FILE_RESULTS, "a") as file:
-      write_full_line(counts, videos_folder)
+    write_full_line(counts, videos_folder)
     
     
     
@@ -290,8 +290,8 @@ def save_total_count(max_counters: List[LineZoneMaxCounterHelper], folder_path: 
     
 def create_all_results_file(counts: List):
   data = ["Punto"]
-  for i in [1, 2]:
-    for class_name, _, _ in counts:
+  for class_name, _, _ in counts:
+    for i in [1, 2]:
       for j in [str(i).zfill(2) for i in range(VIDEOS_PER_FOLDER)]:
         data.append(f"mov{i}_{class_name}_{j}")
   
